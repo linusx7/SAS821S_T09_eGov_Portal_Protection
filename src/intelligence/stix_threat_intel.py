@@ -264,5 +264,44 @@ class ThreatIntelligenceManager:
             json.dump(report, f, indent=2)
 
 if __name__ == '__main__':
-    # Simple test
-    print("STIX Threat Intel initialized.")
+    import os
+    import pandas as pd
+    
+    PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    RAW_DIR = os.path.join(PROJECT_ROOT, 'data', 'raw')
+    PROCESSED_DIR = os.path.join(PROJECT_ROOT, 'data', 'processed')
+    
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
+    
+    auth_df = pd.read_csv(os.path.join(RAW_DIR, 'auth_db_audit_logs.csv'))
+    
+    attacker_ips = auth_df[auth_df['src_ip'].str.startswith('198.51.100.') | auth_df['src_ip'].str.startswith('203.0.113.')]['src_ip'].unique().tolist()
+    if 'is_impossible_travel' in auth_df.columns:
+        compromised_citizens = auth_df[auth_df['is_impossible_travel'] == 1]['citizen_id'].dropna().unique().tolist()
+    else:
+        compromised_citizens = []
+    
+    manager = ThreatIntelligenceManager()
+    
+    pirs = manager.define_priority_intelligence_requirements()
+    threat_bundle = manager.build_threat_bundle(attacker_ips, compromised_citizens, ["T1110.004", "T1041"])
+    ip_reputation = manager.enrich_with_reputation(attacker_ips)
+    
+    op_intel = manager.generate_operational_intel_card(threat_bundle)
+    exec_summary = manager.generate_executive_summary(threat_bundle, len(compromised_citizens), "CRITICAL")
+    
+    manager.export_stix_bundle(threat_bundle, os.path.join(PROCESSED_DIR, 'stix_bundle.json'))
+    
+    pir_report = {
+        'pirs': pirs,
+        'operational_intel_card': op_intel,
+        'executive_summary': exec_summary,
+        'ip_reputation': [{'ip': k, **v} for k, v in ip_reputation.items()],
+        'total_indicators': sum(1 for obj in threat_bundle.get('objects', []) if obj['type'] == 'indicator'),
+        'threat_actor_name': next((obj['name'] for obj in threat_bundle.get('objects', []) if obj['type'] == 'threat-actor'), 'Unknown')
+    }
+    
+    with open(os.path.join(PROCESSED_DIR, 'pir_report.json'), 'w') as f:
+        json.dump(pir_report, f, indent=2)
+        
+    print(f"STIX Threat Intel Complete. Generated bundle with {pir_report['total_indicators']} indicators.")

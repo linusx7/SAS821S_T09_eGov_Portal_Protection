@@ -140,3 +140,70 @@ class UEBADetector:
             plt.close()
         else:
             plt.show()
+
+if __name__ == '__main__':
+    import os
+    import json
+    
+    PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    RAW_DIR = os.path.join(PROJECT_ROOT, 'data', 'raw')
+    PROCESSED_DIR = os.path.join(PROJECT_ROOT, 'data', 'processed')
+    
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
+    
+    auth_df = pd.read_csv(os.path.join(RAW_DIR, 'auth_db_audit_logs.csv'))
+    api_df = pd.read_csv(os.path.join(RAW_DIR, 'api_gateway_logs.csv'))
+    
+    detector = UEBADetector(contamination=0.05)
+    
+    impossible_travel = detector.detect_impossible_travel(auth_df)
+    off_hours = detector.detect_off_hours_access(auth_df)
+    priv_escalation = detector.detect_privilege_escalation(auth_df)
+    user_baselines = detector.build_user_baseline(auth_df)
+    
+    api_numeric = api_df[['src_ip', 'request_payload_bytes', 'response_time_ms', 'http_status']].copy()
+    api_features = api_numeric.groupby('src_ip').mean().fillna(0)
+    
+    detector.fit(api_features)
+    scores, labels = detector.detect_anomalies(api_features)
+    
+    def default_serializer(obj):
+        if isinstance(obj, pd.Timestamp):
+            return str(obj)
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if pd.isna(obj):
+            return None
+        return str(obj)
+        
+    it_cols = ['citizen_id', 'timestamp', 'travel_speed_kmh', 'src_ip', 'geo_country', 'geo_city', 'latitude', 'longitude']
+    available_cols = [c for c in it_cols if c in impossible_travel.columns]
+    it_events = impossible_travel[impossible_travel['impossible_travel_flag'] == 1][available_cols].to_dict('records')
+    oh_events = off_hours[off_hours['off_hours_flag'] == 1].to_dict('records')
+    pe_events = priv_escalation[priv_escalation['privilege_escalation_flag'] == 1].to_dict('records')
+    
+    results = {
+        'impossible_travel_events': [{k: v for k, v in e.items() if pd.notna(v)} for e in it_events],
+        'off_hours_events': {
+            'count': len(oh_events),
+            'events': [{k: v for k, v in e.items() if pd.notna(v)} for e in oh_events]
+        },
+        'privilege_escalation_events': {
+            'count': len(pe_events),
+            'events': [{k: v for k, v in e.items() if pd.notna(v)} for e in pe_events]
+        },
+        'anomaly_scores': scores.tolist(),
+        'anomaly_labels': labels.tolist(),
+        'user_baselines': [{k: v for k, v in e.items() if pd.notna(v)} for e in user_baselines.to_dict('records')],
+        'total_anomalies_detected': int(sum(labels == -1)),
+        'contamination_rate': detector.contamination
+    }
+    
+    with open(os.path.join(PROCESSED_DIR, 'ueba_results.json'), 'w') as f:
+        json.dump(results, f, default=default_serializer, indent=2)
+        
+    print(f"UEBA Anomaly Detection Complete. Found {results['total_anomalies_detected']} anomalies.")

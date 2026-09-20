@@ -4,6 +4,7 @@ Supervised detector for credential stuffing and WAF evasion.
 import os
 import pandas as pd
 import numpy as np
+import json
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 from sklearn.model_selection import GridSearchCV, cross_val_score
@@ -13,7 +14,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 import logging
+import sys
 
+# Ensure src is in python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from src.pipelines.feature_engineering import get_feature_names, create_training_dataset
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class SupervisedSecurityDetector:
@@ -60,13 +67,22 @@ class SupervisedSecurityDetector:
         y_prob = self.predict_proba(X_test)[:, 1] if len(np.unique(y_test)) > 1 else np.zeros(len(y_test))
         
         metrics = {
-            'confusion_matrix': confusion_matrix(y_test, y_pred),
+            'confusion_matrix': confusion_matrix(y_test, y_pred).tolist(),
             'classification_report': classification_report(y_test, y_pred),
-            'roc_auc': roc_auc_score(y_test, y_prob) if len(np.unique(y_test)) > 1 else 0.0,
-            'precision': precision_score(y_test, y_pred, zero_division=0),
-            'recall': recall_score(y_test, y_pred, zero_division=0),
-            'f1': f1_score(y_test, y_pred, zero_division=0)
+            'roc_auc': float(roc_auc_score(y_test, y_prob)) if len(np.unique(y_test)) > 1 else 0.0,
+            'precision': float(precision_score(y_test, y_pred, zero_division=0)),
+            'recall': float(recall_score(y_test, y_pred, zero_division=0)),
+            'f1': float(f1_score(y_test, y_pred, zero_division=0))
         }
+        
+        if len(np.unique(y_test)) > 1:
+            fpr, tpr, _ = roc_curve(y_test, y_prob)
+            metrics['fpr'] = fpr.tolist()
+            metrics['tpr'] = tpr.tolist()
+        else:
+            metrics['fpr'] = []
+            metrics['tpr'] = []
+            
         return metrics
 
     def cross_validate(self, X: pd.DataFrame, y: pd.Series, cv=5) -> np.ndarray:
@@ -79,58 +95,64 @@ class SupervisedSecurityDetector:
             return df.sort_values(by='importance', ascending=False)
         return pd.DataFrame()
 
-    def plot_confusion_matrix(self, X_test: pd.DataFrame, y_test: pd.Series, save_path=None):
-        y_pred = self.predict(X_test)
-        cm = confusion_matrix(y_test, y_pred)
-        plt.figure(figsize=(6, 4))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-        plt.title('Confusion Matrix')
-        plt.xlabel('Predicted')
-        plt.ylabel('Actual')
-        if save_path:
-            plt.savefig(save_path)
-            plt.close()
-        else:
-            plt.show()
-
-    def plot_roc_curve(self, X_test: pd.DataFrame, y_test: pd.Series, save_path=None):
-        if len(np.unique(y_test)) <= 1:
-            return
-        y_prob = self.predict_proba(X_test)[:, 1]
-        fpr, tpr, _ = roc_curve(y_test, y_prob)
-        plt.figure(figsize=(6, 4))
-        plt.plot(fpr, tpr, label=f'AUC = {roc_auc_score(y_test, y_prob):.2f}')
-        plt.plot([0, 1], [0, 1], 'r--')
-        plt.title('ROC Curve')
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.legend()
-        if save_path:
-            plt.savefig(save_path)
-            plt.close()
-        else:
-            plt.show()
-
-    def plot_feature_importance(self, top_n=15, save_path=None):
-        df_imp = self.get_feature_importance().head(top_n)
-        if df_imp.empty:
-            return
-        plt.figure(figsize=(10, 6))
-        sns.barplot(x='importance', y='feature', data=df_imp)
-        plt.title('Feature Importance')
-        if save_path:
-            plt.savefig(save_path)
-            plt.close()
-        else:
-            plt.show()
-
     def save_model(self, path: str):
-        joblib.dump(self.model, path)
+        joblib.dump(self, path)
         logger.info(f"Model saved to {path}")
 
     def load_model(self, path: str):
-        self.model = joblib.load(path)
+        loaded = joblib.load(path)
+        self.model = loaded.model
+        self.feature_names_in_ = loaded.feature_names_in_
         logger.info(f"Model loaded from {path}")
 
 if __name__ == '__main__':
-    print("Supervised Detector module ready.")
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    data_dir = os.path.join(base_dir, 'data')
+    proc_dir = os.path.join(data_dir, 'processed')
+    features_path = os.path.join(proc_dir, 'ml_features.csv')
+    
+    if not os.path.exists(features_path):
+        logger.error(f"Features file not found at {features_path}. Please run feature_engineering.py first.")
+        exit(1)
+        
+    df = pd.read_csv(features_path)
+    logger.info(f"Loaded {len(df)} samples.")
+    
+    X_train, X_test, y_train, y_test = create_training_dataset(df, df['label'])
+    
+    logger.info("Training Random Forest...")
+    rf_detector = SupervisedSecurityDetector(model_type='random_forest')
+    rf_detector.train(X_train, y_train)
+    rf_metrics = rf_detector.evaluate(X_test, y_test)
+    rf_cv = rf_detector.cross_validate(X_train, y_train).tolist()
+    
+    logger.info("Training XGBoost...")
+    xgb_detector = SupervisedSecurityDetector(model_type='xgboost')
+    xgb_detector.train(X_train, y_train)
+    xgb_metrics = xgb_detector.evaluate(X_test, y_test)
+    xgb_cv = xgb_detector.cross_validate(X_train, y_train).tolist()
+    
+    best_detector = rf_detector if rf_metrics['f1'] > xgb_metrics['f1'] else xgb_detector
+    best_model_name = 'Random Forest' if rf_metrics['f1'] > xgb_metrics['f1'] else 'XGBoost'
+    best_metrics = best_detector.evaluate(X_test, y_test)
+    
+    logger.info(f"Best model is {best_model_name} with F1: {best_metrics['f1']:.4f}")
+    
+    # Save the best model
+    best_model_path = os.path.join(proc_dir, 'best_model.pkl')
+    best_detector.save_model(best_model_path)
+    
+    # Save metrics
+    metrics_out = {
+        'best_model': best_model_name,
+        'metrics': best_metrics,
+        'cv_scores': rf_cv if best_model_name == 'Random Forest' else xgb_cv,
+        'feature_importances': best_detector.get_feature_importance().set_index('feature')['importance'].to_dict()
+    }
+    
+    metrics_path = os.path.join(proc_dir, 'model_metrics.json')
+    with open(metrics_path, 'w') as f:
+        json.dump(metrics_out, f, indent=4)
+        
+    logger.info(f"Metrics saved to {metrics_path}")
+    logger.info(best_metrics['classification_report'])

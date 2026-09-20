@@ -57,7 +57,7 @@ graph TD
 
 1. **Clone repository:**
    ```bash
-   git clone https://github.com/knwillem/SAS821S_T09_eGov_Portal_Protection.git
+   git clone https://github.com/linusx7/SAS821S_T09_eGov_Portal_Protection.git
    cd SAS821S_T09_eGov_Portal_Protection
    ```
 2. **Create virtual environment:**
@@ -82,14 +82,38 @@ graph TD
    ```bash
    python -m src.pipelines.etl_pipeline
    ```
-7. **Train models:**
+7. **Train supervised ML model (Random Forest / XGBoost):**
    ```bash
    python -m src.models.supervised_detector
    ```
-8. **Launch dashboard:**
+8. **Run UEBA & unsupervised anomaly detection (Isolation Forest / Impossible Travel):**
    ```bash
-   streamlit run app/streamlit_app.py
+   python -m src.models.ueba_anomaly_detector
    ```
+9. **Run adversarial robustness evaluation:**
+   ```bash
+   python -m src.models.adversarial_evaluator
+   ```
+10. **Build incident timeline & correlation engine:**
+    ```bash
+    python -m src.intelligence.correlation_engine
+    ```
+11. **Generate STIX 2.1 threat intelligence bundle:**
+    ```bash
+    python -m src.intelligence.stix_threat_intel
+    ```
+12. **Run NLP citizen complaint mining:**
+    ```bash
+    python -m src.intelligence.nlp_ticket_miner
+    ```
+13. **Run Monte Carlo security control simulation:**
+    ```bash
+    python -m src.simulation.monte_carlo_simulator
+    ```
+14. **Launch decision-support dashboard:**
+    ```bash
+    streamlit run app/streamlit_app.py
+    ```
 
 ## Project Structure
 
@@ -130,7 +154,7 @@ SAS821S_T09_eGov_Portal_Protection/
 | **C10** Reproducibility | Fixed random seeds (`SEED = 42`), pinned versions |
 
 ## Repository
-https://github.com/knwillem/SAS821S_T09_eGov_Portal_Protection
+https://github.com/linusx7/SAS821S_T09_eGov_Portal_Protection
 
 ## License
 MIT

@@ -16,7 +16,7 @@ from faker import Faker
 SEED = 42
 NUM_CITIZENS = 500
 START_TIME = datetime(2026, 8, 15, 0, 0, 0)
-OUTPUT_DIR = r"C:\Users\Linus\.gemini\antigravity\scratch\SAS821S_T09_eGov_Portal_Protection\data\raw"
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "raw")
 
 # IP Ranges
 NORMAL_IP_PREFIX = "192.0.2."

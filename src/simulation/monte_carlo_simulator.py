@@ -304,8 +304,21 @@ This report evaluates three distinct security control scenarios across a range o
         return report
 
 if __name__ == "__main__":
+    import os
+    import json
+    
     simulator = SecurityControlSimulator(n_iterations=100)
     results = simulator.run_simulation()
     stats = simulator.compute_statistics(results)
     print(stats.head())
     print(simulator.generate_simulation_report(stats))
+    
+    # Save results to data/processed/simulation_results.json
+    output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "processed")
+    os.makedirs(output_dir, exist_ok=True)
+    
+    output_path = os.path.join(output_dir, "simulation_results.json")
+    stats_dict = stats.to_dict(orient="records")
+    with open(output_path, "w") as f:
+        json.dump(stats_dict, f, indent=4)
+    print(f"Simulation results saved to {output_path}")

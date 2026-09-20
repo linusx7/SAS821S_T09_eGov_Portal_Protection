@@ -383,5 +383,57 @@ class IncidentCorrelationEngine:
         plt.close()
 
 if __name__ == '__main__':
-    # Simple test
-    print("Correlation Engine initialized.")
+    import os
+    import dataclasses
+    
+    PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    RAW_DIR = os.path.join(PROJECT_ROOT, 'data', 'raw')
+    PROCESSED_DIR = os.path.join(PROJECT_ROOT, 'data', 'processed')
+    
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
+    
+    waf_df = pd.read_csv(os.path.join(RAW_DIR, 'web_waf_logs.csv'))
+    api_df = pd.read_csv(os.path.join(RAW_DIR, 'api_gateway_logs.csv'))
+    auth_df = pd.read_csv(os.path.join(RAW_DIR, 'auth_db_audit_logs.csv'))
+    complaints_df = pd.read_json(os.path.join(RAW_DIR, 'citizen_complaints.json'))
+    
+    engine = IncidentCorrelationEngine()
+    engine.load_all_sources(waf_df, api_df, auth_df, complaints_df)
+    
+    engine.identify_attack_phases()
+    engine.build_timeline()
+    affected = engine.get_affected_citizens()
+    attackers = engine.get_attacker_ips()
+    
+    report = engine.generate_incident_report()
+    
+    with open(os.path.join(PROCESSED_DIR, 'incident_report.md'), 'w') as f:
+        f.write(report)
+        
+    def custom_serializer(obj):
+        if isinstance(obj, pd.Timestamp):
+            return obj.isoformat()
+        if dataclasses.is_dataclass(obj):
+            return dataclasses.asdict(obj)
+        if isinstance(obj, set):
+            return list(obj)
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return str(obj)
+
+    results = {
+        'phases': [dataclasses.asdict(p) for p in engine.attack_phases],
+        'timeline_events': [dataclasses.asdict(t) for t in engine.timeline],
+        'affected_citizens': affected,
+        'attacker_ips': attackers,
+        'total_events_correlated': len(engine.timeline)
+    }
+    
+    with open(os.path.join(PROCESSED_DIR, 'incident_timeline.json'), 'w') as f:
+        json.dump(results, f, default=custom_serializer, indent=2)
+        
+    print(f"Correlation Engine Complete. Correlated {results['total_events_correlated']} events.")

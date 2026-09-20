@@ -94,9 +94,9 @@ def run_etl_pipeline(raw_dir: str, output_dir: str) -> pd.DataFrame:
     feature_store = build_feature_store(waf_df, api_df, auth_df)
     
     os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'security_feature_store.parquet')
+    output_path = os.path.join(output_dir, 'security_feature_store.csv')
     if not feature_store.empty:
-        feature_store.to_parquet(output_path, index=False)
+        feature_store.to_csv(output_path, index=False)
         logger.info(f"Saved feature store to {output_path}")
         
         print("=== Data Quality Report ===")
