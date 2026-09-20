@@ -77,28 +77,28 @@ def render(data_dict: dict):
     if not api_df.empty:
         df = api_df.copy()
     else:
-        import numpy as np
-        np.random.seed(42)
         df = pd.DataFrame({
             'timestamp': pd.date_range(start='2026-08-15', periods=1000, freq='T').astype(str),
-            'src_ip': np.random.choice(['192.0.2.10', '198.51.100.20', '203.0.113.30', '192.0.2.55'], 1000),
-            'citizen_id': [f"CIT-{np.random.randint(100000, 999999)}" for _ in range(1000)],
-            'endpoint': np.random.choice(['/login', '/api/v1/tax/records', '/profile', '/api/v1/civil/registry'], 1000),
+            'src_ip': ['192.0.2.10', '198.51.100.20', '203.0.113.30', '192.0.2.55'] * 250,
+            'citizen_id': [f"CIT-{i+100000}" for i in range(1000)],
+            'endpoint': ['/login', '/api/v1/tax/records', '/profile', '/api/v1/civil/registry'] * 250,
         })
 
     # Calibrate realistic risk scores if not already set
     if 'risk_score' not in df.columns:
+        import random
+        random.seed(42)
         def compute_row_risk(row):
             ip = str(row.get('src_ip', ''))
             endpoint = str(row.get('endpoint', ''))
             if '203.0.113.' in ip:  # Botnet
-                return np.random.randint(75, 100)
+                return random.randint(75, 100)
             elif '198.51.100.' in ip:  # Recon
-                return np.random.randint(55, 80)
+                return random.randint(55, 80)
             elif 'tax' in endpoint or 'civil' in endpoint:
-                return np.random.randint(30, 60)
+                return random.randint(30, 60)
             else:
-                return np.random.randint(1, 30)
+                return random.randint(1, 29)
 
         df['risk_score'] = df.apply(compute_row_risk, axis=1)
 
