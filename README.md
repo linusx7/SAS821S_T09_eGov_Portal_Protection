@@ -46,12 +46,13 @@ graph TD
 
 ## Dataset Overview
 
-| Dataset | Record Count | Key Fields |
-|---------|--------------|------------|
-| `web_waf_logs.csv` | ~6,000 | `src_ip`, `http_method`, `url_path`, `waf_action`, `attack_type` |
-| `api_gateway_logs.csv` | ~4,000 | `src_ip`, `endpoint`, `citizen_id`, `request_payload_bytes` |
-| `auth_db_audit_logs.csv` | ~3,500 | `citizen_id`, `auth_event`, `db_query`, `is_impossible_travel` |
-| `citizen_complaints.json` | ~300 | `citizen_id`, `complaint_text`, `urgency_level`, `category` |
+| Dataset | Target Count | Actual Generated | Key Fields |
+|---------|--------------|------------------|------------|
+| `web_waf_logs.csv` | ~6,000 | 8,313 | `src_ip`, `http_method`, `url_path`, `waf_action`, `attack_type` |
+| `api_gateway_logs.csv` | ~4,000 | 6,680 | `src_ip`, `endpoint`, `citizen_id`, `request_payload_bytes` |
+| `auth_db_audit_logs.csv` | ~3,500 | 3,170 | `citizen_id`, `auth_event`, `db_query`, `is_impossible_travel` |
+| `citizen_complaints.json` | ~300 | 201 | `citizen_id`, `complaint_text`, `urgency_level`, `category` |
+| **Total** | **~13,800** | **18,364** | **Exceeds course minimum of 5,000 records** |
 
 ## Installation & Setup
 
