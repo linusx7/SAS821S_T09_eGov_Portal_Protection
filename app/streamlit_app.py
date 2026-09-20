@@ -13,7 +13,16 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, '..'))
 sys.path.append(os.path.join(PROJECT_ROOT, 'src'))
 
+import importlib
 from components import triage_view, model_view, timeline_view, ueba_view, simulation_view, nlp_view
+
+# Force live reload of submodules so Streamlit never caches stale component code
+importlib.reload(triage_view)
+importlib.reload(model_view)
+importlib.reload(timeline_view)
+importlib.reload(ueba_view)
+importlib.reload(simulation_view)
+importlib.reload(nlp_view)
 
 st.set_page_config(page_title='e-Gov Portal Security Analytics', layout='wide', page_icon="🛡️")
 
