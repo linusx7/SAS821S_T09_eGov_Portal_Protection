@@ -52,7 +52,7 @@ graph TD
 | `api_gateway_logs.csv` | ~4,000 | 6,680 | `src_ip`, `endpoint`, `citizen_id`, `request_payload_bytes` |
 | `auth_db_audit_logs.csv` | ~3,500 | 3,170 | `citizen_id`, `auth_event`, `db_query`, `is_impossible_travel` |
 | `citizen_complaints.json` | ~300 | 201 | `citizen_id`, `complaint_text`, `urgency_level`, `category` |
-| **Total** | **~13,800** | **18,364** | **Exceeds course minimum of 5,000 records** |
+| **Total** | **~13,800** | **18,364** |  |
 
 ## Installation & Setup
 
