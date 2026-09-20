@@ -92,13 +92,17 @@ def render(data_dict: dict):
             ip = str(row.get('src_ip', ''))
             endpoint = str(row.get('endpoint', ''))
             if '203.0.113.' in ip:  # Botnet
-                return random.randint(75, 100)
+                if 'tax' in endpoint or 'civil' in endpoint:
+                    return random.randint(82, 99)  # Terminate (Red)
+                else:
+                    return random.randint(62, 79)  # Rate-Limit (Orange)
             elif '198.51.100.' in ip:  # Recon
-                return random.randint(55, 80)
+                return random.randint(60, 78)  # Rate-Limit (Orange)
             elif 'tax' in endpoint or 'civil' in endpoint:
-                return random.randint(30, 60)
+                # Step-Up MFA challenge for high-value citizen endpoints
+                return random.randint(32, 58) if random.random() < 0.45 else random.randint(5, 28)
             else:
-                return random.randint(1, 29)
+                return random.randint(1, 28)  # Allow (Green)
 
         df['risk_score'] = df.apply(compute_row_risk, axis=1)
 
@@ -118,8 +122,24 @@ def render(data_dict: dict):
 
     with col1:
         st.markdown("**Real-Time Session Telemetry with TTAPR Actions**")
+        filter_act = st.selectbox(
+            "Triage Priority Filter:",
+            ["All Priorities (Highest Risk First)", "Critical Threats (Terminate)", "Step-Up MFA Challenges", "Rate-Limited Sessions", "Normal Traffic (Allow)"]
+        )
+
         display_cols = [c for c in ['timestamp', 'src_ip', 'citizen_id', 'endpoint', 'risk_score', 'Recommended_Action'] if c in df.columns]
-        display_df = df[display_cols].head(50)
+
+        if filter_act == "Critical Threats (Terminate)":
+            display_df = df[df['Recommended_Action'] == 'Terminate'][display_cols].head(50)
+        elif filter_act == "Step-Up MFA Challenges":
+            display_df = df[df['Recommended_Action'] == 'MFA'][display_cols].head(50)
+        elif filter_act == "Rate-Limited Sessions":
+            display_df = df[df['Recommended_Action'] == 'Rate-Limit'][display_cols].head(50)
+        elif filter_act == "Normal Traffic (Allow)":
+            display_df = df[df['Recommended_Action'] == 'Allow'][display_cols].head(50)
+        else:
+            # Sort highest risk threats at the top so analyst sees Terminate, Rate-Limit, MFA, and Allow
+            display_df = df.sort_values(by='risk_score', ascending=False)[display_cols].head(50)
 
         def color_risk(val):
             if isinstance(val, (int, float)):
